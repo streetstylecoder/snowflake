@@ -1,0 +1,61 @@
+select * from @geospartial_stage_single 
+( file_format => geo_json);
+
+describe stage geospartial_stage_single;
+CREATE OR REPLACE FILE FORMAT geo_json
+TYPE = 'JSON';
+
+LIST @geospartial_stage_single;
+
+SELECT 
+    $1
+FROM @geospartial_stage_single (file_format => 'geo_json')
+LIMIT 10;
+
+
+WITH raw_data AS (
+    SELECT
+        data.$1:crs.properties.name::STRING AS crs_name,
+        data.$1:features AS features
+    FROM @geospartial_stage_single (file_format => 'geo_json') AS data
+),
+flattened_data AS (
+    SELECT
+        raw_data.crs_name,
+        feature.value:properties.SATELLITE_NAME::STRING AS satellite_name,
+        feature.value:properties.DL_BEAM_NAME::STRING AS DL_BEAM_NAME,
+        feature.value:geometry AS geometry
+    FROM raw_data,
+    LATERAL FLATTEN(input => raw_data.features) AS feature
+)
+SELECT
+    crs_name AS name,
+    satellite_name,
+    DL_BEAM_NAME,
+    TO_GEOGRAPHY(geometry::variant) AS coordinates
+FROM flattened_data;
+
+
+
+SELECT $1
+FROM @geospartial_stage_single (file_format => 'geo_json');
+
+SELECT $1
+FROM @geospartial_stage_single (file_format => 'geo_json')
+LIMIT 10;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
