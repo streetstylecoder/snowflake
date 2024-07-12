@@ -1,0 +1,57 @@
+create or replace stage s3_geo_json
+    url='s3://uni-lab-files-more/dlkw/trails/trails_geojson/';
+
+create or replace stage s3_geo_parquet
+    url="s3://uni-lab-files-more/dlkw/trails/trails_parquet";
+
+list @s3_geo_json;
+
+create or replace file format FF_JSON
+    type=JSON;
+
+create or replace file format FF_PARQUET
+    type=PARQUET;
+
+
+select $1
+from @s3_geo_json ( file_format => FF_JSON);
+
+select $1:sequence_1 as seq1,
+    $1:trail_name::varchar as trail_name,
+    $1:longitude as longitude,
+    $1:latitude as latitude,
+    $1:sequence_2 as seq2,
+    $1:elevation as elevation
+from @s3_geo_parquet
+( file_format => FF_PARQUET)
+order by point_id;
+
+create or replace view test as 
+select 
+$1:sequence_1 as point_id,
+$1:trail_name::varchar as trail_name,
+$1:latitude::number(11,8) as lat,
+$1:longitude::number(11,8) as long,
+long||' '||lat as coord_pair
+from @s3_geo_parquet
+(file_format=>ff_parquet)
+order by point_id;
+
+select * 
+from test
+limit 100;
+
+SELECT TOP 100
+    long || ' ' || lat AS coord_pair,
+    'POINT(' || long || ' ' || lat || ')' AS trail_point
+FROM test;
+
+select
+'LINESTRING('||
+listagg(coord_pair,',')
+within group (order by point_id)
+||')' as my_linestring
+from test
+where point_id <=10
+group by trail_name;
+
